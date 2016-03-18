@@ -5,7 +5,7 @@
 
 $(document).ready(function(){
   $('#header').html('<div class="header-strap"><div class="header-content">' +
-                    '<img src="../example-api-common/images/index.png" alt="australian government, australia: open for business"><div class="brand">Free Trade Agreement Portal</div></div></div>' + 
+                    '<img src="//ausftas.github.io/example-api-common/images/index.png" alt="australian government, australia: open for business"><div class="brand">Free Trade Agreement Portal</div></div></div>' + 
                     '<div class="header-divider-strap"></div>');
 
   var example = 'https://github.com/AusFTAs/' + window.location.toString().match(/[/](example-api-.*)[/]/)[1];
