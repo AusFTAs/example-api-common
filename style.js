@@ -10,7 +10,7 @@ $(document).ready(function(){
 
   var example = null;
 
-  if (window.location.toString().match(/[/](example-api-.*)[/]/)[1])
+  if (window.location.toString().match(/[/](example-api-.*)[/]/))
   {
     var example = 'https://github.com/AusFTAs/' + window.location.toString().match(/[/](example-api-.*)[/]/)[1];
   }
