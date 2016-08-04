@@ -1,7 +1,7 @@
 "use strict";
 (function($)
 {
-  var api_prefix = localStorage && localStorage.ftaPortalAPIEndpoint || 'https://ftaportal.dfat.gov.au/api/v2/json';
+  var api_prefix = localStorage && localStorage.ftaPortalAPIEndpoint || 'https://api.ftaportal.dfat.gov.au/api/v2/json';
   
   // main api calling method
   $.invoke = function(url, callback, error)
@@ -34,7 +34,8 @@
         // Experimental feature.
         // Put data version before API access.
         // This will increase caching TTL when versions match or fail miserably.
-        api_prefix = api_prefix.replace(/api/, dataVersion + '/api')
+        // TODO: Does not work for api.* host.
+        // api_prefix = api_prefix.replace(/.au\/api/, '.au/' + dataVersion + '/api')
         $.invoke('/tariffs/agreements', function(agreements_)
         {
           agreements = agreements_;
