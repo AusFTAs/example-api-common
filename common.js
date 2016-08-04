@@ -31,11 +31,10 @@
       // preload commonly used data items
       $.invoke('/version', function(dataVersion)
       {
-        // Experimental feature.
+        // Optional experimental feature.
         // Put data version before API access.
         // This will increase caching TTL when versions match or fail miserably.
-        // TODO: Does not work for api.* host.
-        // api_prefix = api_prefix.replace(/.au\/api/, '.au/' + dataVersion + '/api')
+        api_prefix = api_prefix.replace(/.au\/api/, '.au/' + dataVersion + '/api')
         $.invoke('/tariffs/agreements', function(agreements_)
         {
           agreements = agreements_;
