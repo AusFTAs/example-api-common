@@ -1,77 +1,130 @@
 "use strict";
-(function($)
+
+(function (FTA)
 {
-  var api_prefix = localStorage && localStorage.ftaPortalAPIEndpoint || 'https://api.ftaportal.dfat.gov.au/api/v2/json';
-  
+  let api_prefix = localStorage && localStorage.ftaPortalAPIEndpoint || 'https://api.ftaportal.dfat.gov.au/api/v2/json';
+
   // main api calling method
-  $.invoke = function(url, callback, error)
-  {
-    var requestURL = api_prefix + url;
-    $.getJSON(requestURL).done(function(data)
-    {
-      if (data.deprecated)
+
+  FTA.invoke = url =>
+    new Promise((resolve, reject) =>
+      d3.json(api_prefix + url, (error, data) =>
       {
-        console.error(data.deprecated);
-      }
-      callback(data.results);
-    }).error(error || function(){});
-  };
-  
-  // common data items
-  var hierarchy = null;
-  var agreements = null;
-  var startCallback = null;
-  
-  $.startExample = function(callback)
-  {
-    startCallback = callback;
-    // wait for page to load
-    $(document).ready(function()
-    {
-      // preload commonly used data items
-      $.invoke('/version', function(dataVersion)
-      {
-        // Optional experimental feature.
-        // Put data version before API access.
-        // This will increase caching TTL when versions match or fail miserably.
-        api_prefix = api_prefix.replace(/.au\/api/, '.au/' + dataVersion + '/api')
-        $.invoke('/tariffs/agreements', function(agreements_)
+        if (error)
         {
-          agreements = agreements_;
-          $.invoke('/tariffs/hierarchy', function(hierarchy_)
-          {
-            hierarchy = hierarchy_;
-            (startCallback || function(){})(hierarchy, agreements);
-          });
-        });
-      });
-    });
-  };
-  
-  // get common data items  
-  $.getHSHierarchy = function(callback)
+          return reject(error);
+        }
+        if (data.deprecated)
+        {
+          console.error('DEPRECATION WARNING:', data.deprecated);
+        }
+        resolve(data.results);
+      }));
+
+  FTA.start = startCallback =>
+    Promise.all([
+        FTA.invoke('/version'),
+        FTA.invoke('/tariffs/agreements'),
+        FTA.invoke('/tariffs/hierarchy')
+      ])
+    .then(data =>
+      (startCallback || function () {})(data[2], data[1], data[0]));
+
+
+  FTA.formatSearchQuery = query =>
+    typeof query === 'string' &&
+    query.toLowerCase() // case insensitive; only search for lowercase characters
+    .replace(/[^a-zA-Z0-9 \.]/g, ' ') // these characters add no value to search
+    .replace(/\s+/g, '+') // remove all spaces with joiners
+    .replace(/^\+|\+$/g, ''); // remove any leading or trailing joiners
+
+
+  // decode bit encoded lists (keywords)
+  FTA.decodeBitEncodedList = function (enumeration, encoded)
   {
-    (callback || function(){})(hierarchy);
-  };
-  
-  $.getAgreements = function(callback)
-  {
-    (callback || function(){})(agreements);
+    let output = [];
+    for (var x = 0;
+      (1 << x) <= encoded; x++)
+    {
+      if (((1 << x) & encoded) !== 0)
+      {
+        output.push(enumeration[x]);
+      }
+    }
+    return output;
   };
 
+
   // convert extracted subheading data into intended hierarchy tree
-  $.produceHierarchyTree = function(headingData)
+  FTA.stratifyHeadingDetails = function (heading, subheadings)
   {
+    let subheadingsList = [];
+
+    for (let hscode in subheadings)
+    {
+      subheadings[hscode].hscode = hscode;
+      subheadingsList.push(subheadings[hscode]);
+    }
+
+    subheadingsList.push(subheadings[heading.hscode] = heading);
+
+    return d3.stratify()
+      .id(d => d.hscode)
+      .parentId(d =>
+      {
+        let id = d.hscode;
+        while (id.length > 0)
+        {
+          id = id.substr(0, id.length - 1);
+          if (subheadings[id] !== undefined)
+          {
+            return id;
+          }
+        }
+        return null;
+      })
+      (subheadingsList);
+  };
+
+  FTA.stratifyHierarchy = function (hierarchy)
+  {
+    let hierarchyList = [
+      {
+        hscode: 'HS',
+        description: 'Harmonised System',
+        parent: ''
+      }
+    ];
+
+    for (let hscode in hierarchy)
+    {
+      if (hierarchy[hscode].type === 'section')
+      {
+        hierarchy[hscode].parent = 'HS';
+      }
+      hierarchy[hscode].hscode = hscode;
+      hierarchyList.push(hierarchy[hscode]);
+    }
+
+    return d3.stratify()
+      .id(d => d.hscode)
+      .parentId(d => d.parent)
+      (hierarchyList)
+      .sort((a, b) => a.id.match(/^[IVX]+$/) ? romanToNumber(a.id) - romanToNumber(b.id) : a.id > b.id ? 1 : a.id === b.id ? 0 : -1);
+  };
+
+  /*
+    // My old version that uses list order instead of d3 stratify. Note that it produces slightly different tree node attributes. This wasn't written with d3-stratify in mind.
     var tree = {};
         
-    Object.keys(headingData).forEach(function(key)
+    Object.keys(subheadings).forEach(function(key)
     {
       tree[key] = tree[key] || {};
       tree[key].hscode = key;
-      Object.keys(headingData[key])
+      Object.keys(subheadings[key])
             .forEach(function(field)
       {
-        tree[key][field] = headingData[key][field];
+        tree[key][field] = subheadings[key][field];
       });
     });
     Object.keys(tree).sort().reverse().forEach(function(key)
@@ -91,12 +144,12 @@
       }
     });
     return tree;
-  };
+    */
 
   // pretty print hs code
-  $.beautifyHSCode = function (code, showLabel)
+  FTA.uglifyHSCode = function (code, showLabel, hasTariff)
   {
-    var hscode = code.replace(/[^0-9]/g, '');
+    let hscode = code.replace(/[^0-9]/g, '');
     switch (hscode.length)
     {
     case 0:
@@ -111,22 +164,69 @@
     case 6:
       return (showLabel ? 'Subheading ' : '') + hscode.substr(0, 4) + '.' + hscode.substr(4);
     default:
-      return (showLabel ? 'Item ' : '') + hscode.substr(0, 4) + '.' + hscode.substr(4, 2) + '.' + hscode.substr(6);
-    }
-  };
-  
-  // decode bit encoded lists
-  $.decodeKeywords = function (target, encoded)
-  {
-    var output = [];
-    for (var x = 0; (1 << x) <= encoded; x++)
-    {
-      if (((1 << x) & encoded) !== 0)
+      if (hasTariff)
       {
-        output.push(target[x]);
+        return (showLabel ? 'Item ' : '') + hscode.substr(0, 4) + '.' + hscode.substr(4, 2) + '.' + hscode.substr(6);
+      }
+      else
+      {
+        return (showLabel ? 'Subheading ' : '') + hscode.substr(0, 4) + '.' + hscode.substr(4, 2) + hscode.substr(6);
       }
     }
-    return output;
+  };
+
+  // https://gist.github.com/christophemarois/26fcd93e12725fabf58c
+  function romanToNumber(str)
+  {
+
+    var doubles = {
+        'CM': 900,
+        'CD': 400,
+        'XC': 90,
+        'XL': 40,
+        'IX': 9,
+        'IV': 4
+      },
+      singles = {
+        'M': 1000,
+        'D': 500,
+        'C': 100,
+        'L': 50,
+        'X': 10,
+        'V': 5,
+        'I': 1
+      };
+
+    var n = 0;
+    while (str.length)
+    {
+
+      var d = str.substr(0, 2),
+        p = str.substr(0, 1);
+
+      if (Object.keys(doubles)
+        .indexOf(d) >= 0)
+      {
+        n += doubles[d];
+        str = str.substr(2);
+        continue;
+      }
+
+      if (Object.keys(singles)
+        .indexOf(p) >= 0)
+      {
+        n += singles[p];
+        str = str.substr(1);
+        continue;
+      }
+
+      throw new Error('Invalid roman numeral');
+
+    }
+
+    return n;
+
   }
 
-}(jQuery));
+})(window.FTAPortalAPIExample = window.FTAPortalAPIExample ||
+{});

@@ -163,3 +163,35 @@ h3 {
 .pre {
   font-family: monospace;
 }
+
+/* Simple css/d3 tree view implementation */
+.tree-node
+{
+  display: block;
+  transition: width 2s;
+}
+
+.expand::before
+{
+  content: "+ ";
+}
+
+.contract::before
+{
+  content: "- ";
+}
+
+.expand:hover, .contract:hover
+{
+  background: #DDEEFF;
+}
+
+.tree-node-body
+{
+  margin-left: 2em;
+}
+
+.hidden
+{
+  display: none;
+}
