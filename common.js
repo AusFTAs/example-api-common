@@ -2,7 +2,7 @@
 
 (function (FTA)
 {
-  let api_prefix = localStorage && localStorage.ftaPortalAPIEndpoint || 'https://api.ftaportal.dfat.gov.au/api/v2/json';
+  let api_prefix = localStorage && localStorage.ftaPortalAPIEndpoint || 'https://api.ftaportal.dfat.gov.au/api/v3';
 
   // main api calling method
 
@@ -21,14 +21,14 @@
         resolve(data.results);
       }));
 
+
   FTA.start = startCallback =>
     Promise.all([
-        FTA.invoke('/version'),
-        FTA.invoke('/tariffs/agreements'),
-        FTA.invoke('/tariffs/hierarchy')
+        FTA.invoke('/version.json'),
+        FTA.invoke('/agreements.json')
       ])
     .then(data =>
-      (startCallback || function () {})(data[2], data[1], data[0]));
+      (startCallback || function () {})(data[0], data[1]));
 
 
   FTA.formatSearchQuery = query =>
@@ -116,7 +116,7 @@
   /*
     // My old version that uses list order instead of d3 stratify. Note that it produces slightly different tree node attributes. This wasn't written with d3-stratify in mind.
     var tree = {};
-        
+
     Object.keys(subheadings).forEach(function(key)
     {
       tree[key] = tree[key] || {};
