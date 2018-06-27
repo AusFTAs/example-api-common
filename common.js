@@ -146,6 +146,14 @@
     return tree;
     */
 
+  FTA.stratifyServicesHierarchy = hierarchy =>
+    d3.stratify()
+      .id(d => d.w120code)
+      .parentId(d => d.parent)
+      (Object.entries(hierarchy)
+        .map(x => Object.assign(x[1], {w120code: x[0]})))
+          .sort((a, b) => a.data.order - b.data.order);
+
   // pretty print hs code
   FTA.uglifyHSCode = function (code, showLabel, hasTariff)
   {
